@@ -30,6 +30,8 @@ class Follow(models.Model):
     follow_object = generic.GenericForeignKey()
     actor_only = models.BooleanField("Only follow actions where the object is "
         "the target.", default=True)
+    send_email = models.BooleanField("Send email notification for actions",
+        default=False)
     started = models.DateTimeField(default=now)
     objects = FollowManager()
 
@@ -155,6 +157,7 @@ target_stream = Action.objects.target
 user_stream = Action.objects.user
 model_stream = Action.objects.model_actions
 followers = Follow.objects.followers
+action_followers = Follow.objects.action_followers
 following = Follow.objects.following
 
 def setup_generic_relations():

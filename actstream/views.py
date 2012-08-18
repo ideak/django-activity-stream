@@ -29,9 +29,15 @@ def follow_unfollow(request, content_type_id, object_id, do_follow=True, actor_o
     """
     ctype = get_object_or_404(ContentType, pk=content_type_id)
     actor = get_object_or_404(ctype.model_class(), pk=object_id)
+    if 'email_notification' in request.GET:
+        flag_str = request.GET['email_notification']
+        email_notification = flag_str.lower() in ['true', 'yes', '1']
+    else:
+        email_notification = False
 
     if do_follow:
-        actions.follow(request.user, actor, actor_only=actor_only)
+        actions.follow(request.user, actor, actor_only=actor_only,
+                       email_notification=email_notification)
         return respond(request, 201)   # CREATED
     actions.unfollow(request.user, actor)
     return respond(request, 204)   # NO CONTENT

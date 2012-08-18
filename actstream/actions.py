@@ -13,7 +13,8 @@ except ImportError:
     now = datetime.datetime.now
 
 
-def follow(user, obj, send_action=True, actor_only=True):
+def follow(user, obj, send_action=True, actor_only=True,
+           email_notification=False):
     """
     Creates a relationship allowing the object's activities to appear in the
     user's stream.
@@ -38,11 +39,18 @@ def follow(user, obj, send_action=True, actor_only=True):
     follow, created = Follow.objects.get_or_create(user=user,
         object_id=obj.pk,
         content_type=ContentType.objects.get_for_model(obj),
-        actor_only=actor_only)
+        actor_only=actor_only, send_email=email_notification)
     if send_action and created:
         action.send(user, verb=_('started following'), target=obj)
     return follow
 
+def set_all_email_notifications(user, enable):
+    from actstream.models import Follow
+
+    follow_list = Follow.objects.filter(user=user)
+    for f in follow_list:
+        f.send_email=enable
+        f.save()
 
 def unfollow(user, obj, send_action=False):
     """
@@ -80,6 +88,27 @@ def is_following(user, obj):
     return bool(Follow.objects.filter(user=user, object_id=obj.pk,
         content_type=ContentType.objects.get_for_model(obj)).count())
 
+def send_email_notifications(action):
+    """
+    Send email notification when an action happens for all followers
+    following the actor of the action.
+    """
+    from actstream.models import action_followers
+    from django.conf import settings as django_settings
+    from django.template.loader import render_to_string
+    from django.core.mail import send_mass_mail
+
+    users = action_followers(action)
+    users = [u for u in users if u.get_profile().email_notification]
+    context = { "action": action }
+    subject = render_to_string('email_notification/message_subject.txt',
+                               context)
+    subject = subject.rstrip()
+    message = render_to_string('email_notification/message_body.txt',
+                               context)
+    from_addr = getattr(django_settings, "CONTACT_EMAIL", {})
+    email_batch = [(subject, message, from_addr, [u.email]) for u in users]
+    send_mass_mail(email_batch)
 
 def action_handler(verb, **kwargs):
     """
@@ -109,3 +138,5 @@ def action_handler(verb, **kwargs):
     if settings.USE_JSONFIELD and len(kwargs):
         newaction.data = kwargs
     newaction.save()
+    send_email_notifications(newaction)
+

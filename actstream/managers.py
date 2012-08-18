@@ -118,14 +118,36 @@ class FollowManager(GFKManager):
         queryset = self.for_object(instance)
         return queryset.filter(user=user).exists()
 
-    def followers(self, actor):
+    def object_followers(self, objects, with_email_notification=False):
+        """
+        Returns a list of User objects who are following the given objects.
+        """
+        q = Q()
+        for obj in objects:
+            obj_type = ContentType.objects.get_for_model(obj)
+            q = q | Q(content_type=obj_type, object_id=obj.pk)
+        if with_email_notification:
+            q = q | Q(send_email=True)
+            
+        return [f.user for f in self.filter(q).select_related('user')]
+
+    def action_followers(self, action, with_email_notification=False):
+        """
+        Returns a list of User objects who are following the given
+        action, that is the users who follow any of the action's actor,
+        action_object or target.
+        """
+        objs = [o for o in action.actor, action.action_object,
+                action.target if o]
+
+        return self.object_followers(objs, with_email_notification)
+
+
+    def followers(self, actor, with_email_notification=False):
         """
         Returns a list of User objects who are following the given actor (eg my followers).
         """
-        return [follow.user for follow in self.filter(
-            content_type=ContentType.objects.get_for_model(actor),
-            object_id=actor.pk
-        ).select_related('user')]
+        return self.object_followers([actor], with_email_notification)
 
     def following(self, user, *models):
         """
