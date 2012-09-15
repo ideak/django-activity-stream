@@ -149,6 +149,12 @@ class Action(models.Model):
     def get_absolute_url(self):
         return ('actstream.views.detail', [self.pk])
 
+class ActionSeen(models.Model):
+    """
+    Keeps track of users who have seen a particular Action
+    """
+    user = models.ForeignKey(User)
+    action = models.ForeignKey(Action)
 
 # convenient accessors
 actor_stream = Action.objects.actor

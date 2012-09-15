@@ -2,6 +2,7 @@ import datetime
 
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ObjectDoesNotExist
 
 from actstream.exceptions import check_actionable_model
 from actstream import settings
@@ -51,6 +52,41 @@ def set_all_email_notifications(user, enable):
     for f in follow_list:
         f.send_email=enable
         f.save()
+
+def mark_all_actions_seen(user):
+    from actstream.models import user_stream, ActionSeen
+
+    actions = user_stream(user)
+    for act in actions:
+        ActionSeen.objects.get_or_create(user=user, action=act)
+
+def mark_action_seen(user, action_id):
+    from actstream.models import Action, ActionSeen
+
+    try:
+        action = Action.objects.get(pk=action_id)
+    except Action.DoesNotExist:
+        return
+    ActionSeen.objects.get_or_create(user=user, action=action)
+
+def mark_action_unseen(user, action_id):
+    from actstream.models import Action, ActionSeen
+
+    try:
+        action = Action.objects.get(pk=action_id)
+        seen = ActionSeen.objects.get(user=user, action=action)
+    except ObjectDoesNotExist:
+        return
+    seen.delete()
+
+def is_action_seen(user, action_id):
+    from actstream.models import ActionSeen
+
+    try:
+        ActionSeen.objects.get(user=user, action=action_id)
+    except ActionSeen.DoesNotExist:
+        return False
+    return True
 
 def unfollow(user, obj, send_action=False):
     """
